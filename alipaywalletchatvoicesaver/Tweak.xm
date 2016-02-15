@@ -122,6 +122,8 @@ static UIColor *s_originalColor;
  */
 
 - (void)collectMenu:(id)arg1{
+	%orig;
+
 	if(!s_originalColor){
 		s_originalColor = self.backgroundColor;
 	}
@@ -187,6 +189,8 @@ static UIColor *s_originalColor;
     }else{
     	[self evt_alert:@"failed to save"];
     }
+
+
 }
 
 
@@ -202,3 +206,88 @@ static UIColor *s_originalColor;
 	return %orig;
 }
 %end
+
+
+%hook FavAudioDetailViewController
+
+
+%new
+- (void)evt_alert:(id)msg{
+	UIAlertView * alert =[[UIAlertView alloc ] initWithTitle:@""
+                                                message:[NSString stringWithFormat:@"%@",msg]
+                                                delegate:self
+                                                cancelButtonTitle:@"OK"
+                                                otherButtonTitles: nil];
+    [alert show];
+}
+
+- (void)actionSheet:(id)arg1 clickedButtonAtIndex:(int)arg2{
+	// Cancel Button
+	if(arg2 != 1) {
+		%orig;
+		return;
+	}
+
+	if(!s_voiceManager){
+		[self evt_alert:@"voice manager null, please play any voice"];
+		return;
+	}
+
+	NSString *cloudId = self.audioPlayerView.data.link;
+
+	NSString *displayName = self.audioPlayerView.data.cacheUserName;
+    if(! displayName || [displayName isEqualToString:@""]){
+    	displayName = @"self";
+    }
+
+	NSDateFormatter* dateFormatter = [[NSDateFormatter alloc] init];
+    [dateFormatter setDateStyle:kCFDateFormatterFullStyle];
+    [dateFormatter setDateFormat:@"yyyy-MM-dd HH:mm:ss"];
+    NSString *timeLineString = [dateFormatter stringFromDate:self.audioPlayerView.data.gmtCreate]; 
+
+	NSData *voiceData = [s_voiceManager.voiceCache queryVoiceDataForKey:cloudId formatType:1];
+
+	if(!voiceData){
+		[self evt_alert:@"Can not get voice data from cache"];
+		return;
+	}
+
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSURL *url = (id)[[fileManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] firstObject];
+    
+    NSString *voiceBaseDir = [[url path] stringByAppendingPathComponent:@"favvoice"];
+    if(![fileManager fileExistsAtPath:voiceBaseDir]){
+        if(![fileManager createDirectoryAtPath:voiceBaseDir withIntermediateDirectories:YES attributes:nil error:nil]){
+        	[self evt_alert:@"error create dir"];
+        	return;
+        }
+    }
+    NSString *voiceUserDir = [voiceBaseDir stringByAppendingPathComponent:displayName];
+    if(![fileManager fileExistsAtPath:voiceUserDir]){
+        if(![fileManager createDirectoryAtPath:voiceUserDir withIntermediateDirectories:YES attributes:nil error:nil]){
+        	[self evt_alert:@"error create dir"];
+        	return;
+        }
+    }
+    
+    NSString *fileName = [NSString stringWithFormat:@"%@(%@).wav",timeLineString,[NSString stringWithFormat:@"%d",(int)self.audioPlayerView.length]];
+    NSString *filePath = [voiceUserDir stringByAppendingPathComponent:fileName];
+    if([voiceData writeToFile:filePath atomically:YES]){
+    	NSString *msg = [NSString stringWithFormat:@"succeed saved to %@",filePath];
+    	[self evt_alert:msg];
+    }else{
+    	[self evt_alert:@"failed to save"];
+    }
+
+	%orig;
+}
+
+- (void)viewDidLoad{
+	%orig;
+
+	self.view.backgroundColor = [UIColor cyanColor];
+}
+
+%end
+
+
