@@ -81,6 +81,7 @@ static int newptrace(int request, pid_t pid, caddr_t addr, int data){
 
 
 static APVoiceManager *s_voiceManager;
+static UIColor *s_originalColor;
 
 %hook CTMessageCell
 
@@ -92,6 +93,14 @@ static APVoiceManager *s_voiceManager;
                                                 cancelButtonTitle:@"OK"
                                                 otherButtonTitles: nil];
     [alert show];
+}
+
+- (void)prepareForReuse{
+	if(s_originalColor){
+		self.backgroundColor = [UIColor whiteColor];
+	}
+
+	%orig;
 }
 
 /*
@@ -113,6 +122,10 @@ static APVoiceManager *s_voiceManager;
  */
 
 - (void)collectMenu:(id)arg1{
+	if(!s_originalColor){
+		s_originalColor = self.backgroundColor;
+	}
+
 	self.backgroundColor = [UIColor greenColor];
 
 	UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
